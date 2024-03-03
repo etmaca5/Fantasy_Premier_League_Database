@@ -97,5 +97,5 @@ CREATE TABLE matchweek (
 -- Adding an index to the player table
 -- Likely will be doing many searches for player by their value (sorting by
 -- value, checking if a user can buy a player for their team, selling players)
-CREATE INDEX idx_prop_id ON player
+CREATE INDEX idx_player_value ON player
   (player_value);
