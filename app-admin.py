@@ -39,7 +39,7 @@ def get_conn():
           # SHOW VARIABLES WHERE variable_name LIKE 'port';
           port='3306',  # this may change!
           password='adminpw',
-          database='shelterdb' # replace this with your database name
+          database='fpldb'
         )
         print('Successfully connected.')
         return conn
@@ -94,7 +94,35 @@ def example_query():
 # choose how to implement these depending on whether you have app.py or
 # app-client.py vs. app-admin.py (in which case you don't need to
 # support any prompt functionality to conditionally login to the sql database)
-
+def login():
+    """
+    Handles logging in for admins.
+    """
+    username = input('Username: ')
+    password = input('Password: ')
+    cursor = conn.cursor()
+    sql = 'SELECT authenticate(\'%s\', \'%s\');' % (username, password, )
+    try:
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+        for row in rows:
+            (authentication)
+        if len(rows) == 0:
+            print('Your account does not exist!')
+        else:
+            row = rows[0]
+            if row[0] == 1:
+                print("Success!\n")
+                show_options()
+            else:
+                print("Incorrect password or your account does not exist!\n")
+                show_options()
+    except mysql.connector.Error as err:
+        if DEBUG:
+            sys.stderr(err)
+            sys.exit(1)
+        else:
+            sys.stderr("""An error occurred, please email our support team""")
 
 # ----------------------------------------------------------------------
 # Command-Line Functionality
