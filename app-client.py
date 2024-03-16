@@ -117,8 +117,8 @@ def show_options_menu():
     From here can go to the leaderboard, View stats,
     Change the players in one's team and quit the program
     """
-    print("You now have %d player(s) and %d left in the bank" % (num_players, team_budget_remaining))
     print('\nWhat would you like to do? ')
+    print('  (c) - Quick Team Check')
     print('  (l) - View Leaderboard')
     print('  (s) - View Stats')
     print('  (p) - Change Players (%d players currently in the team)' % num_players)
@@ -127,29 +127,44 @@ def show_options_menu():
     ans = input('Enter an option: ').lower()
     if ans == 'q':
         quit_ui()
+    elif ans == 'c':
+        print("You now have %d player(s) and %d left in the bank" % (num_players, team_budget_remaining))
     elif ans == 'l':
         show_leaderboard()
     elif ans == 's':
-        show_player_stats()
+        view_stats()
     elif ans == 'p':
         change_team_menu()
     else:
         print("Please enter a valid option")
-        pass
 
 def show_leaderboard():
     """
     Displays the leaderboard for the user and allows them to go back
     to the main menu if they need to want to
     """
-    # TODO: print("ADD LEADERBOARD QUERY IN HERE")
-    print('  (e) - Exit to main menu')
-    print('  (p) - Change Players')
-    ans = input('Enter an option: ').lower()
-    if ans == 'e':
-        return
-    elif ans == '':
-        pass
+    print("\n\n")
+    sql_leaderboard = """
+    SELECT fpl_team_name, points
+    FROM fpl_team
+    ORDER BY points DESC;
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute(sql_leaderboard)
+        rows = cursor.fetchall()
+        print("LEADERBOARD:")
+        for i in range(len(rows)):
+            row = rows[i]
+            print("Team name:", row[0], "points:", int(row[1]), "rank:", i + 1)
+        print("\n\n")
+    except mysql.connector.Error as err:
+        # If you're testing, it's helpful to see more details printed.
+        if DEBUG:
+            sys.stderr(err)
+            sys.exit(1)
+        else:
+            sys.stderr('An error with login occurred, please try again with another account')
 
 
 def show_login_menu():
@@ -190,9 +205,9 @@ def login_attempt():
     global user_id
     cursor = conn.cursor()
     print('\nWould you like to login?')
-    print('(y) - yes')
-    print('(n) - no, create account instead')
-    login_true = input('Enter an option:').lower()
+    print('  (y) - yes')
+    print('  (n) - no, create account instead')
+    login_true = input('Enter an option: ').lower()
     if login_true == 'n':
         show_login_menu()
     username = input('\nPlease enter your username: ')
@@ -283,7 +298,16 @@ def select_team():
     global user_id
     cursor = conn.cursor()
     print("\nWhich team would you like to select:")
-    sql_teams = 'SELECT fpl_team_name, fpl_team_value FROM fpl_team WHERE user_id = %s;'
+    sql_teams = """
+    SELECT 
+        ft.fpl_team_name, 
+        ft.fpl_team_value, 
+        COUNT(ftp.player_id) AS number_of_players
+    FROM fpl_team ft
+    LEFT JOIN fpl_team_players ftp ON ft.fpl_team_name = ftp.fpl_team_name
+    WHERE ft.user_id = %s
+    GROUP BY ft.fpl_team_name, ft.fpl_team_value;
+    """
     try:
         cursor.execute(sql_teams, (user_id, ))
         rows = cursor.fetchall()
@@ -292,19 +316,20 @@ def select_team():
             select_team_menu()
         else:
             print("Team names:")
-            # holds all the teams
+            # holds all the teams with the num players and value
             teams = {}
-            print(rows)
             for row in rows:
-                teams[row[0]] = row[1]
-                print(row[0])
-            team_name = input("Please type in the name of a team:")
+                teams[row[0]] = (row[1], row[2])
+                print('%s  -  with value: %d ' % (row[0] , row[1]))
+            team_name = input("Please type in the name of a team: ")
             while team_name not in teams.keys():
-                team_name = input("Please type in the name of a team from the above list:")
+                team_name = input("Please type in the name of a team from the above list: ")
             global fpl_team_name
             fpl_team_name = team_name
             global team_budget_remaining
-            team_budget_remaining = STARTING_TEAM_VALUE - teams[team_name]
+            team_budget_remaining = STARTING_TEAM_VALUE - teams[team_name][0]
+            global num_players
+            num_players = teams[team_name][1]
             print("Succesfully selected team!\n")
         return True
     except mysql.connector.Error as err:
@@ -318,7 +343,7 @@ def select_team():
 def create_team():
     global user_id
     cursor = conn.cursor()
-    team_name = input("What would you like the name of your team to be:")
+    team_name = input("What would you like the name of your team to be: ")
     sql_add_team = 'CALL sp_add_team(%s, %s, %s);'
     try:
         cursor.execute(sql_add_team, (team_name, user_id, 0, ))
@@ -354,7 +379,7 @@ def change_team_menu():
         remove_player()
         change_team_menu()
     elif ans == 's':
-        show_player_stats()
+        view_stats()
     elif ans == 'e':
         return
     else:
@@ -409,6 +434,9 @@ def add_player():
                 print("Enter a valid player ID")
                 continue
             player_value = rows[0][0]
+            if player_value == None:
+                print("Enter a valid player ID")
+                continue
             print("player value: %d" % player_value)
         except mysql.connector.Error as err:
             if DEBUG:
@@ -477,22 +505,176 @@ def remove_player():
     team_budget_remaining += player_value
     num_players -= 1
 
-def show_player_stats():
+def view_stats():
     """
     Displays the menu where the user can view the players' stats.
     Allows the user to go back to main menu or directly to the change
     players menu.
     """
+    print('\nOptions:')
     print('  (p) - Change Players')
     print('  (e) - Exit to main menu')
+    print('  (g) - Top Goalscorers')
+    print('  (a) - Top Assisters')
+    print('  (c) - Most Clean Sheets')
+    print('  (m) - Most Minutes Played')
+    print('  (b) - Most points')
+    print('  (i) - Misc')
     # TODO: add a bunch of options for different stats that can be looked at
     ans = input('Enter an option: ').lower()
     if ans == 'e':
         return
     elif ans == 'p':
         change_team_menu()
+    elif ans in ['g', 'a', 'c', 'm', 'b']:
+        num_best = int(input("How long would you like the list of top players to be: "))
+        sql = ''
+        stat = ""
+        if ans == 'g':
+            stat = "Total Goals"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.goals) AS total_goals
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_goals DESC;
+            """
+        elif ans == 'a':
+            stat = "Total Assists"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.assists) AS total_assists
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_assists DESC;       
+            """
+        elif ans == 'c':
+            stat = "Total Clean Sheets"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.clean_sheets) AS total_clean_sheets
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            WHERE p.position IN ('GK', 'DEF')
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_clean_sheets DESC;
+            """
+        elif ans == 'm':
+            stat = "Total Minutes Played"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.minutes_played) AS total_minutes_played
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_minutes_played DESC;
+            """
+        elif ans == 'b':
+            stat = "Total Points"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.points) AS total_points
+            FROM player player_id
+            GROUP BY p.player_id, p.player_
+            JOIN matchweek m ON p.player_id = m.pname, p.position
+            ORDER BY total_points DESC;
+            """
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            if(len(rows) == 0):
+                print("No data available")
+                return
+            print("Format: Player_id, Name, Position, %s " % stat)
+            for i in range(num_best):
+                row = rows[i]
+                print(row[0], row[1], row[2], int(row[3]),  stat)
+        except mysql.connector.Error as err:
+            if DEBUG:
+                sys.stderr(err)
+                sys.exit(1)
+            else: sys.stderr('An error occurred, please choose different statistics')
+    elif ans == 'i':
+        print("Choose one of the following statistics: ")
+        print("  (a) - Players who average over 0.05 points per minute")
+        print("  (b) - All Forwards ordered by price")
+        print("  (c) - All Midfielders ordered by assists")
+        print("  (d) - Top 20 most selected players (by managers)")
+        adv_ans = input("Select a statistic from above: ")
+        sql = ""
+        stat = ""
+        format = ""
+        if adv_ans == 'a':
+            stat = "Players who average over 0.05 points per minute"
+            format = "Player ID, Name, Club, Total Points, Value, Points Per Minute"
+            sql = """
+            SELECT p.player_id, p.player_name, p.team_name, 
+                SUM(m.points) AS total_points, p.player_value, 
+                SUM(m.points) / NULLIF(SUM(m.minutes_played), 0) 
+                AS points_per_minute
+            FROM player p JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.team_name, p.player_value
+            HAVING (SUM(m.points) / NULLIF(SUM(m.minutes_played), 0)) > 0.05
+            ORDER BY total_points DESC;
+            """
+        elif adv_ans == 'b':
+            stat = "All forwards ordered by price"
+            format = "Player ID, Name, Club, Value"
+            sql = """
+            SELECT player_id, player_name, team_name, player_value
+            FROM player
+            WHERE position = 'FWD'
+            ORDER BY player_value;
+            """
+        elif adv_ans == 'c':
+            stat = "All Midfielders ordered by assists"
+            format = "Player ID, Name, Total Assists"
+            sql = """
+            SELECT p.player_id, p.player_name, SUM(m.assists) AS total_assists
+            FROM player p JOIN matchweek m ON p.player_id = m.player_id
+            WHERE p.position = 'MID'
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_assists;
+            """
+        elif adv_ans == 'd':
+            stat = "Top 20 most selected players (by managers)"
+            format = "Player ID, Name, Number of Times Selected"
+            sql = """
+            SELECT p.player_id, p.player_name, 
+                COUNT(DISTINCT fpl.user_id) AS number_of_managers
+            FROM player p
+            LEFT JOIN fpl_team_players fpl ON p.player_id = fpl.player_id
+            GROUP BY p.player_id, p.player_name
+            ORDER BY number_of_managers;
+            """
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            if(len(rows) == 0):
+                print("No data available")
+                return
+            print(stat)
+            print(format)
+            if adv_ans == 'a':
+                for row in rows:
+                    print(row[:3], int(row[3]), "Total Points", int(row[4]), "Value", float(row[5]), "PPM")
+            elif adv_ans == 'd':
+                # print top 20 for misc 'd'
+                for i in range(20):
+                    row = rows[i]
+                    print(row[0], row[1], int(row[2]))
+            else:
+                for row in rows:
+                    print(row[:-1], int(row[-1]))            
+        except mysql.connector.Error as err:
+            if DEBUG:
+                sys.stderr(err)
+                sys.exit(1)
+            else: sys.stderr('An error occurred, please choose a different statistic')
     else:
-        show_player_stats()
+        view_stats()
+    if ans in ['g', 'a', 'c', 'm', 'b', 'i']:
+        view_stats()
+
 
 def quit_ui():
     """
