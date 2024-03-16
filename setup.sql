@@ -17,17 +17,6 @@ CREATE TABLE user (
     -- password not stored for security
 );
 
--- Stores team information for the fantasy team (the team managed by a user)
-CREATE TABLE fpl_team (
-    fpl_team_name   VARCHAR(20),
-    user_id         BIGINT UNSIGNED,
-    points          SMALLINT        DEFAULT 0,
-    fpl_team_value  NUMERIC(4, 1)   NOT NULL,
-    PRIMARY KEY (fpl_team_name, user_id),
-    FOREIGN KEY (user_id) REFERENCES user(user_id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
-);
 
 -- Stores player information
 CREATE TABLE player (
@@ -42,16 +31,33 @@ CREATE TABLE player (
     PRIMARY KEY (player_id)
 );
 
+
+-- Stores team information for the fantasy team (the team managed by a user)
+CREATE TABLE fpl_team (
+    fpl_team_name   VARCHAR(20),
+    user_id         BIGINT UNSIGNED,
+    points          SMALLINT   DEFAULT 0,
+    fpl_team_value  SMALLINT   NOT NULL,
+    PRIMARY KEY (fpl_team_name, user_id),
+    FOREIGN KEY (user_id) REFERENCES user(user_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
+
 -- Stores the players that each FPL team owns
 -- Multiple FPL teams can own the same player
 CREATE TABLE fpl_team_players (
     fpl_team_name   VARCHAR(20),
     player_id       SMALLINT,
-    PRIMARY KEY (fpl_team_name, player_id),
+    user_id        BIGINT UNSIGNED,
+    PRIMARY KEY (fpl_team_name, player_id, user_id),
     FOREIGN KEY (fpl_team_name) REFERENCES fpl_team(fpl_team_name)
         ON DELETE CASCADE
         ON UPDATE CASCADE,
     FOREIGN KEY (player_id) REFERENCES player(player_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES user(user_id)
         ON DELETE CASCADE
         ON UPDATE CASCADE
 );

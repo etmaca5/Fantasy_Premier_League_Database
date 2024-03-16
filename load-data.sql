@@ -49,5 +49,5 @@ FROM staging_matchweek2;
 
 DROP TABLE IF EXISTS staging_matchweek2;
 
-
+-- TODO: need to manually put in users and passwords for testing at the end
 
