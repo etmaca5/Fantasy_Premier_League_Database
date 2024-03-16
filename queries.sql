@@ -3,16 +3,9 @@
 -- this query finds all the players belonging to a certain fpl team
 -- TODO: change the actual values inside of the queries so that they work with the inputted data
 -- user_id and team_name are specific to user
-SELECT 
-    p.player_id, 
-    p.player_name,
-    p.position,
-    p.player_value,
-    p.total_points
-FROM 
-fpl_team_players AS fpl JOIN player AS p ON fpl.player_id = p.player_id
-WHERE 
-    fpl.user_id = 1 AND fpl.fpl_team_name = "e";
+SELECT p.player_id, p.player_name, p.position, p.player_value, p.total_points
+FROM fpl_team_players AS fpl JOIN player AS p ON fpl.player_id = p.player_id
+WHERE fpl.user_id = 1 AND fpl.fpl_team_name = "e";
 
 -- finds the number of players and the value of a given fpl team
 SELECT 
