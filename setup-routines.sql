@@ -80,7 +80,7 @@ BEGIN
 END !
 DELIMITER ;
 
--- trigger to automatically 
+-- trigger to automatically increase the team_value when a player is added
 DELIMITER !
 CREATE TRIGGER tr_increase_team_value
 AFTER INSERT ON fpl_team_players
@@ -94,7 +94,8 @@ END!
 
 DELIMITER ;
 
-
+-- trigger to automatically decrease the team value when a player is removed
+-- from a team
 DELIMITER !
 CREATE TRIGGER tr_decrease_team_value
 AFTER DELETE ON fpl_team_players
@@ -106,4 +107,23 @@ BEGIN
     WHERE fpl_team_name = OLD.fpl_team_name AND user_id = OLD.user_id;
 END!
 
+DELIMITER ;
+
+
+-- trigger which updates the total points in each fpl_team when a new matchweek is added
+DELIMITER !
+CREATE TRIGGER tr_update_points_gw
+AFTER INSERT ON matchweek
+FOR EACH ROW
+BEGIN
+    UPDATE fpl_team ft
+    JOIN (
+        SELECT ftp.fpl_team_name, SUM(m.points) AS total_points
+        FROM fpl_team_players ftp
+        JOIN matchweek m ON ftp.player_id = m.player_id
+        WHERE m.matchweek = NEW.matchweek
+        GROUP BY ftp.fpl_team_name
+    ) AS tp ON ft.fpl_team_name = tp.fpl_team_name
+    SET ft.points = ft.points + tp.total_points;
+END !
 DELIMITER ;

@@ -25,7 +25,7 @@ DELIMITER ;
 -- add each gameweek in
 -- do this for each matchweek
 -- gameweek 1
-
+-- using these temporary tables and inserts allows data to be updated automatically
 CREATE TEMPORARY TABLE staging_matchweek1 LIKE matchweek;
 
 LOAD DATA LOCAL INFILE "data/gw1.csv" INTO TABLE staging_matchweek1
