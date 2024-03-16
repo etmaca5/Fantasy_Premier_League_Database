@@ -13,6 +13,7 @@ team's overall performance.
 """
 # TODO: Make sure you have these installed with pip3 if needed
 import sys  # to print error messages to sys.stderr
+import csv
 import mysql.connector
 # To get error codes from the connector, useful for user-friendly
 # error-handling
@@ -60,31 +61,15 @@ def get_conn():
         sys.exit(1)
 
 # ----------------------------------------------------------------------
-# Functions for Command-Line Options/Query Execution
+# CONSTANTS and global vars
 # ----------------------------------------------------------------------
-def example_query():
-    param1 = ''
-    cursor = conn.cursor()
-    # Remember to pass arguments as a tuple like so to prevent SQL
-    # injection.
-    sql = 'SELECT col1 FROM table WHERE col2 = \'%s\';' % (param1, )
-    try:
-        cursor.execute(sql)
-        # row = cursor.fetchone()
-        rows = cursor.fetchall()
-        for row in rows:
-            (col1val) = (row) # tuple unpacking!
-            # do stuff with row data
-    except mysql.connector.Error as err:
-        # If you're testing, it's helpful to see more details printed.
-        if DEBUG:
-            sys.stderr(err)
-            sys.exit(1)
-        else:
-            # TODO: Please actually replace this :) 
-            sys.stderr('An error occurred, give something useful for clients...')
-
-
+MAX_LOGIN_ATTEMPTS = 5
+STARTING_TEAM_VALUE = 800
+LOWEST_PLAYER_COST = 40
+user_id = -1
+fpl_team_name = ""
+team_budget_remaining = 0
+num_players = 0
 
 # ----------------------------------------------------------------------
 # Functions for Logging Users In
@@ -94,35 +79,105 @@ def example_query():
 # choose how to implement these depending on whether you have app.py or
 # app-client.py vs. app-admin.py (in which case you don't need to
 # support any prompt functionality to conditionally login to the sql database)
-def login():
+
+def show_login_menu():
     """
-    Handles logging in for admins.
+    Displays the menu where the user can login or create an account.
     """
-    username = input('Username: ')
-    password = input('Password: ')
+    print('  (l) - Login')
+    print('  (c) - Create Account')
+    ans = input('Enter an option: ').lower()
+    # ensuring that the user attempts to login or create an account
+    while ans != 'l' and ans != 'c':
+        print('  (l) - Login')
+        print('  (c) - Create Account')
+        ans = input('Either login or create an account: ').lower()
+    if ans == 'l':
+        # user decides to login
+        num_login_attempts = 0
+        correct_login = login_attempt()
+        while correct_login == False:
+            correct_login = login_attempt()
+            num_login_attempts += 1
+            if num_login_attempts >= 5:
+                print("Too many attempts have been failed!")
+                quit_ui()
+    elif ans == 'c':
+        # user decides to create an account
+        create_account()
+
+def login_attempt():
+    """
+    Called when user tries to login, allows them to go back to the main page
+    and create a new account at any point.
+    Returns False if the login attempt was incorrect and true if it was correct
+    """
+    global user_id
     cursor = conn.cursor()
-    sql = 'SELECT authenticate(\'%s\', \'%s\');' % (username, password, )
+    print('\nWould you like to login?')
+    print('  (y) - yes')
+    print('  (n) - no, create account instead')
+    login_true = input('Enter an option: ').lower()
+    if login_true == 'n':
+        show_login_menu()
+    username = input('\nPlease enter your username: ')
+    password  = input('Please enter your password: ')
+    sql_login = "SELECT authenticate(%s, %s);"
+    sql_get_user_id = 'SELECT user_id FROM user WHERE username = %s;'
     try:
-        cursor.execute(sql)
-        rows = cursor.fetchall()
-        for row in rows:
-            (authentication)
-        if len(rows) == 0:
-            print('Your account does not exist!')
+        cursor.execute(sql_login, (username, password, ))
+        rows_authen = cursor.fetchall()
+        if rows_authen[0][0] == 1:
+            print("Authenticated!")
+            cursor.execute(sql_get_user_id, (username, ))
+            rows = cursor.fetchall()
+            if(len(rows) == 0):
+                print("There is an issue with the program")
+                quit
+            user_id = (rows[-1])[0]
+            print("Successfully logged in!\n")
+            return True
         else:
-            row = rows[0]
-            if row[0] == 1:
-                print("Success!\n")
-                show_options()
-            else:
-                print("Incorrect password or your account does not exist!\n")
-                show_options()
+            print("Incorrect username or password\n")
+            return False
+
     except mysql.connector.Error as err:
+        # If you're testing, it's helpful to see more details printed.
         if DEBUG:
             sys.stderr(err)
             sys.exit(1)
         else:
-            sys.stderr("""An error occurred, please email our support team""")
+            sys.stderr('An error with login occurred, please try again with another account')
+    return False
+
+def create_account():
+    global user_id
+    # creates an account for the user
+    cursor = conn.cursor()
+    email = input('Please enter your email: ')
+    username = input('Please enter your username: ')
+    password  = input('Please enter your password: ')
+    sql_password_info = 'CALL sp_add_user(%s, %s, %s)'
+    sql_add_user = 'INSERT INTO user (user_email, username) VALUES (%s, %s); '
+    sql_get_user_id = 'SELECT user_id FROM user WHERE user_email = %s;'
+    try:
+        cursor.execute(sql_password_info, (username, password, 0, ))
+        conn.commit()
+        cursor.execute(sql_add_user, (email, username, ))
+        cursor.execute(sql_get_user_id, (email, ))
+        rows = cursor.fetchall()
+        # sets the global variable user_id
+        user_id = (rows[-1])[0]
+        print("Succesfully created new account!\n")
+    except mysql.connector.Error as err:
+        # If you're testing, it's helpful to see more details printed.
+        if DEBUG:
+            sys.stderr(err)
+            sys.exit(1)
+        else:
+            sys.stderr('An error occurred, please use a different username and password')
+    return True
+
 
 # ----------------------------------------------------------------------
 # Command-Line Functionality
@@ -130,94 +185,15 @@ def login():
 def show_options_menu():
     """
     Displays the main menu of the application.
-    From here can go to the leaderboard, View stats,
-    Change the players in one's team and quit the program
+    From here can view stats, add matchweek data, add players,
+    update a player's value, and quit the program
     """
-    print('What would you like to do? ')
-    print('  (l) - View leaderboard')
+    print('\nWhat would you like to do? ')
     print('  (s) - View Stats')
-    print('  (p) - Change Players')
-    print('  (q) - Quit Program')
-    print()
-    ans = input('Enter an option: ').lower()
-    if ans == 'q':
-        quit_ui()
-    elif ans == 'l':
-        show_leaderboard()
-    elif ans == 's':
-        show_player_stats()
-    elif ans == 'p':
-        show_player_change_menu()
-    elif ans == '':
-        pass
-
-def show_leaderboard():
-    """
-    Displays the leaderboard for the user and allows them to go back
-    to the main menu if they need to want to
-    """
-    # TODO: print("ADD LEADERBOARD QUERY IN HERE")
-    print('  (e) - Exit to main menu')
-    print('  (p) - Change Players')
-    ans = input('Enter an option: ').lower()
-    if ans == 'e':
-        show_options_menu()
-    elif ans == '':
-        pass
-
-def show_player_change_menu():
-    """
-    Displays the menu where the user can change the players out from 
-    their team. 
-    Allows the user to go back to main menu once there are 11 players
-    """
-    
-    print('  (s) - View stats')
-    print('  (e) - Exit to main menu')
-    ans = input('Enter an option: ').lower()
-    # TODO: add condition: must be 11 players in the team in order to move
-    # out of this menu
-    if ans == 'e': 
-        show_options_menu()
-    if ans == 's': 
-        show_player_stats()
-    elif ans == '':
-        pass
-
-def show_player_stats():
-    """
-    Displays the menu where the user can view the players' stats.
-    Allows the user to go back to main menu or directly to the change
-    players menu.
-    """
-    print('  (p) - Change Players')
-    print('  (e) - Exit to main menu')
-    ans = input('Enter an option: ').lower()
-    if ans == 'e':
-        show_options_menu()
-    elif ans == 'p':
-        show_player_change_menu()
-    elif ans == '':
-        pass
-    
-
-
-
-# Another example of where we allow you to choose to support admin vs. 
-# client features  in the same program, or
-# separate the two as different app_client.py and app_admin.py programs 
-# using the same database.
-def show_admin_options():
-    """
-    Displays options specific for admins, such as adding new data <x>,
-    modifying <x> based on a given id, removing <x>, etc.
-    """
-    print('What would you like to do? ')
     print('  (m) - Add Matchweek Data')
     print('  (v) - Update Player Value')
-    print('  (a) - Add Player')
-    print('  (r) - Remove Player')
-    print('  (q) - quit')
+    print('  (p) - Add Player')
+    print('  (q) - Quit Program')
     print()
     ans = input('Enter an option: ').lower()
     if ans == 'q':
@@ -226,28 +202,242 @@ def show_admin_options():
         add_matchweek()
     elif ans == 'v':
         update_player_value()
-    elif ans == 'a':
+    elif ans == 's':
+        view_stats()
+    elif ans == 'p':
         add_player()
-    elif ans == 'r':
-        remove_player()
-    elif ans == '':
-        pass
+    else:
+        print("Please enter a valid option")
 
 def add_matchweek():
     """
-    Allows an admin to add the data for a matchweek, updating the rest of the
-    database accordingly.
+    Allows an admin to add the data for a matchweek in the form of a CSV file
     """
-    f = input('Enter the filename for the matchweek data: ')
-    # TODO: Add code to input data into database
+    cursor = conn.cursor()
+    sql_insert = 'INSERT INTO matchweek (player_id, matchweek, goals, \
+        assists, clean_sheets, minutes_played, points) \
+        VALUES (%s, %s, %s, %s, %s, %s, %s); '
+
+    while True:
+        f = input("Enter the filename for the matchweek data: ")
+        if not f.endswith('.csv'):
+            print("Please input a CSV file.")
+            continue
+        try:
+            with open(f, 'r') as data:
+                reader = csv.reader(data, delimiter=',')
+                header = next(reader, None)
+                if header != ['player_id', 'matchweek', 'goals' , 'assists',
+                              'clean_sheets', 'minutes_played', 'points']:
+                    print("CSV file has incorrect format.")
+                    continue
+                for row in reader:
+                    try:
+                        cursor.execute(sql_insert, (row[0], row[1], row[2],
+                                                    row[3], row[4], row[5],
+                                                    row[6], ))
+                        conn.commit()
+                    except mysql.connector.Error as err:
+                        if DEBUG:
+                            sys.stderr(err)
+                            sys.exit(1)
+                        else: sys.stderr('An error occurred')
+                break
+        except FileNotFoundError:
+            print("File not found. Please input a valid file.")
+
+def add_player():
+    cursor = conn.cursor()
+    player_id = input("Enter the new player's ID: ")
+    player_name = input("Enter the new player's name: ")
+    team_name = input("Enter the new player's team: ")
+    position = input("Enter the new player's position (GK, DEF, MID, FWD): ")
+    player_value = input("Enter the new player's value: ")
+    total_points = 0
+    sql_insert = 'INSERT INTO player (player_id, player_name, team_name, \
+        position, player_value, total_points) \
+        VALUES (%s, %s, %s, %s, %s, %s); '
+    try:
+        cursor.execute(sql_insert, (player_id, player_name, team_name,
+                                    position, player_value, total_points, ))
+        conn.commit()
+    except mysql.connector.Error as err:
+        if DEBUG:
+            sys.stderr(err)
+            sys.exit(1)
+        else: sys.stderr('An error occurred')
 
 def update_player_value():
     """
-    Allows an admin to add the data for a matchweek, updating the rest of the
-    database accordingly.
+    Allows an admin to update a player's value.
     """
-    player_id = int(input('Enter the player_id to be updated: '))
+    player_id = input('Enter the player_id to be updated: ')
     # TODO: Add code to input data into database
+
+def view_stats():
+    """
+    Displays the menu where the user can view the players' stats.
+    Allows the user to go back to main menu or directly to the change
+    players menu.
+    """
+    print('\nOptions:')
+    print('  (e) - Exit to main menu')
+    print('  (g) - Top Goalscorers')
+    print('  (a) - Top Assisters')
+    print('  (c) - Most Clean Sheets')
+    print('  (m) - Most Minutes Played')
+    print('  (b) - Most points')
+    print('  (i) - Misc')
+    # TODO: add a bunch of options for different stats that can be looked at
+    ans = input('Enter an option: ').lower()
+    if ans == 'e':
+        return
+    elif ans in ['g', 'a', 'c', 'm', 'b']:
+        num_best = int(input("How long would you like the list of top players to be: "))
+        sql = ''
+        stat = ""
+        if ans == 'g':
+            stat = "Total Goals"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.goals) AS total_goals
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_goals DESC;
+            """
+        elif ans == 'a':
+            stat = "Total Assists"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.assists) AS total_assists
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_assists DESC;       
+            """
+        elif ans == 'c':
+            stat = "Total Clean Sheets"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.clean_sheets) AS total_clean_sheets
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            WHERE p.position IN ('GK', 'DEF')
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_clean_sheets DESC;
+            """
+        elif ans == 'm':
+            stat = "Total Minutes Played"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.minutes_played) AS total_minutes_played
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_minutes_played DESC;
+            """
+        elif ans == 'b':
+            stat = "Total Points"
+            sql = """
+            SELECT p.player_id, p.player_name, p.position, SUM(m.points) AS total_points
+            FROM player player_id
+            GROUP BY p.player_id, p.player_
+            JOIN matchweek m ON p.player_id = m.pname, p.position
+            ORDER BY total_points DESC;
+            """
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            if(len(rows) == 0):
+                print("No data available")
+                return
+            print("Format: Player_id, Name, Position, %s " % stat)
+            for i in range(num_best):
+                row = rows[i]
+                print(row[0], row[1], row[2], int(row[3]),  stat)
+        except mysql.connector.Error as err:
+            if DEBUG:
+                sys.stderr(err)
+                sys.exit(1)
+            else: sys.stderr('An error occurred, please choose different statistics')
+    elif ans == 'i':
+        print("Choose one of the following statistics: ")
+        print("  (a) - Players who average over 0.05 points per minute")
+        print("  (b) - All Forwards ordered by price")
+        print("  (c) - All Midfielders ordered by assists")
+        print("  (d) - Top 20 most selected players (by managers)")
+        adv_ans = input("Select a statistic from above: ")
+        sql = ""
+        stat = ""
+        format = ""
+        if adv_ans == 'a':
+            stat = "Players who average over 0.05 points per minute"
+            format = "Player ID, Name, Club, Total Points, Value, Points Per Minute"
+            sql = """
+            SELECT p.player_id, p.player_name, p.team_name, 
+                SUM(m.points) AS total_points, p.player_value, 
+                SUM(m.points) / NULLIF(SUM(m.minutes_played), 0) 
+                AS points_per_minute
+            FROM player p JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.team_name, p.player_value
+            HAVING (SUM(m.points) / NULLIF(SUM(m.minutes_played), 0)) > 0.05
+            ORDER BY total_points DESC;
+            """
+        elif adv_ans == 'b':
+            stat = "All forwards ordered by price"
+            format = "Player ID, Name, Club, Value"
+            sql = """
+            SELECT player_id, player_name, team_name, player_value
+            FROM player
+            WHERE position = 'FWD'
+            ORDER BY player_value;
+            """
+        elif adv_ans == 'c':
+            stat = "All Midfielders ordered by assists"
+            format = "Player ID, Name, Total Assists"
+            sql = """
+            SELECT p.player_id, p.player_name, SUM(m.assists) AS total_assists
+            FROM player p JOIN matchweek m ON p.player_id = m.player_id
+            WHERE p.position = 'MID'
+            GROUP BY p.player_id, p.player_name, p.position
+            ORDER BY total_assists;
+            """
+        elif adv_ans == 'd':
+            stat = "Top 20 most selected players (by managers)"
+            format = "Player ID, Name, Number of Times Selected"
+            sql = """
+            SELECT p.player_id, p.player_name, 
+                COUNT(DISTINCT fpl.user_id) AS number_of_managers
+            FROM player p
+            LEFT JOIN fpl_team_players fpl ON p.player_id = fpl.player_id
+            GROUP BY p.player_id, p.player_name
+            ORDER BY number_of_managers;
+            """
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            if(len(rows) == 0):
+                print("No data available")
+                return
+            print(stat)
+            print(format)
+            if adv_ans == 'a':
+                for row in rows:
+                    print(row[:3], int(row[3]), "Total Points", int(row[4]), "Value", float(row[5]), "PPM")
+            elif adv_ans == 'd':
+                # print top 20 for misc 'd'
+                for i in range(20):
+                    row = rows[i]
+                    print(row[0], row[1], int(row[2]))
+            else:
+                for row in rows:
+                    print(row[:-1], int(row[-1]))            
+        except mysql.connector.Error as err:
+            if DEBUG:
+                sys.stderr(err)
+                sys.exit(1)
+            else: sys.stderr('An error occurred, please choose a different statistic')
+    else:
+        view_stats()
 
 
 def quit_ui():
@@ -262,7 +452,11 @@ def main():
     """
     Main function for starting things up.
     """
-    show_options_menu()
+    show_login_menu()
+    # once login menu passes go to select team menu, which then will transition
+    # to the main options menu
+    while True:
+        show_options_menu()
 
 
 if __name__ == '__main__':

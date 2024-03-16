@@ -36,24 +36,21 @@ CREATE TABLE user_info (
     salt CHAR(8) NOT NULL,
 
     -- We use SHA-2 with 256-bit hashes.
-    password_hash BINARY(64) NOT NULL,
-
-    -- Whether or not the user is an admin
-    is_admin BINARY(1) NOT NULL
+    password_hash BINARY(64) NOT NULL
 );
 
 -- Adds a new user to the user_info table, using the specified password (max
 -- of 20 characters). Salts the password with a newly-generated salt value,
 -- and then the salt and hash values are both stored in the table.
 DELIMITER !
-CREATE PROCEDURE sp_add_user(new_username VARCHAR(20), password VARCHAR(20), is_admin BINARY(1))
+CREATE PROCEDURE sp_add_user(new_username VARCHAR(20), password VARCHAR(20))
 BEGIN
   -- Sets up the salt to be used in the password
   DECLARE salt CHAR(8);
   SET salt = make_salt(8);
   -- Inserts new user into user_info table, assumes the username is unique
   INSERT INTO user_info
-    VALUES (new_username, salt, SHA2(CONCAT(salt, password), 256), is_admin);
+    VALUES (new_username, salt, SHA2(CONCAT(salt, password), 256));
 END !
 DELIMITER ;
 

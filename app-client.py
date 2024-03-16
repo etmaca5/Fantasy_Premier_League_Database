@@ -58,6 +58,7 @@ def get_conn():
             # A fine catchall client-facing message.
             sys.stderr('An error occurred, please contact the administrator.')
         sys.exit(1)
+
 # ----------------------------------------------------------------------
 # CONSTANTS and global vars
 # ----------------------------------------------------------------------
@@ -105,7 +106,103 @@ def example_query():
 # app-client.py vs. app-admin.py (in which case you don't need to
 # support any prompt functionality to conditionally login to the sql database)
 
+def show_login_menu():
+    """
+    Displays the menu where the user can login or create an account.
+    """
+    print('  (l) - Login')
+    print('  (c) - Create Account')
+    ans = input('Enter an option: ').lower()
+    # ensuring that the user attempts to login or create an account
+    while ans != 'l' and ans != 'c':
+        print('  (l) - Login')
+        print('  (c) - Create Account')
+        ans = input('Either login or create an account: ').lower()
+    if ans == 'l':
+        # user decides to login
+        num_login_attempts = 0
+        correct_login = login_attempt()
+        while correct_login == False:
+            correct_login = login_attempt()
+            num_login_attempts += 1
+            if num_login_attempts >= 5:
+                print("Too many attempts have been failed!")
+                quit_ui()
+    elif ans == 'c':
+        # user decides to create an account
+        create_account()
 
+def login_attempt():
+    """
+    Called when user tries to login, allows them to go back to the main page
+    and create a new account at any point.
+    Returns False if the login attempt was incorrect and true if it was correct
+    """
+    global user_id
+    cursor = conn.cursor()
+    print('\nWould you like to login?')
+    print('  (y) - yes')
+    print('  (n) - no, create account instead')
+    login_true = input('Enter an option: ').lower()
+    if login_true == 'n':
+        show_login_menu()
+    username = input('\nPlease enter your username: ')
+    password  = input('Please enter your password: ')
+    sql_login = "SELECT authenticate(%s, %s);"
+    sql_get_user_id = 'SELECT user_id FROM user WHERE username = %s;'
+    try:
+        cursor.execute(sql_login, (username, password, ))
+        rows_authen = cursor.fetchall()
+        if rows_authen[0][0] == 1:
+            print("Authenticated!")
+            cursor.execute(sql_get_user_id, (username, ))
+            rows = cursor.fetchall()
+            if(len(rows) == 0):
+                print("There is an issue with the program")
+                quit
+            user_id = (rows[-1])[0]
+            print("Successfully logged in!\n")
+            return True
+        else:
+            print("Incorrect username or password\n")
+            return False
+
+    except mysql.connector.Error as err:
+        # If you're testing, it's helpful to see more details printed.
+        if DEBUG:
+            sys.stderr(err)
+            sys.exit(1)
+        else:
+            sys.stderr('An error with login occurred, please try again with another account')
+    return False
+
+def create_account():
+    global user_id
+    # creates an account for the user
+    cursor = conn.cursor()
+    email = input('Please enter your email: ')
+    username = input('Please enter your username: ')
+    password  = input('Please enter your password: ')
+    sql_password_info = 'CALL sp_add_user(%s, %s, %s)'
+    sql_add_user = 'INSERT INTO user (user_email, username) VALUES (%s, %s); '
+    sql_get_user_id = 'SELECT user_id FROM user WHERE user_email = %s;'
+    try:
+        cursor.execute(sql_password_info, (username, password, 0, ))
+        conn.commit()
+        cursor.execute(sql_add_user, (email, username, ))
+        cursor.execute(sql_get_user_id, (email, ))
+        rows = cursor.fetchall()
+        # sets the global variable user_id
+        user_id = (rows[-1])[0]
+        print("Succesfully created new account!\n")
+    except mysql.connector.Error as err:
+        # If you're testing, it's helpful to see more details printed.
+        if DEBUG:
+            sys.stderr(err)
+            sys.exit(1)
+        else:
+            sys.stderr('An error occurred, please use a different username and password')
+    return True
 
 
 # ----------------------------------------------------------------------
@@ -166,114 +263,11 @@ def show_leaderboard():
         else:
             sys.stderr('An error with login occurred, please try again with another account')
 
-
-def show_login_menu():
-    """
-    Displays the menu where the user can view the players' stats.
-    Allows the user to go back to main menu or directly to the change
-    players menu.
-    """
-    print('  (l) - Login')
-    print('  (c) - Create Account')
-    ans = input('Enter an option: ').lower()
-    # ensuring that the user attempts to login or create an account
-    while ans != 'l' and ans != 'c':
-        print('  (l) - Login')
-        print('  (c) - Create Account')
-        ans = input('Either login or create an account: ').lower()
-    if ans == 'l':
-        # user decides to login
-        num_login_attempts = 0
-        correct_login = login_attempt()
-        while correct_login == False:
-            correct_login = login_attempt()
-            num_login_attempts += 1
-            if num_login_attempts >= 5:
-                print("Too many attempts have been failed!")
-                quit_ui()
-    elif ans == 'c':
-        # user decides to create an account
-        create_account()
-    
-      
-def login_attempt():
-    """
-    Called when user tries to login, allows them to go back to the main page
-    and create a new account at any point.
-    Returns False if the login attempt was incorrect and true if it was correct
-    """
-    global user_id
-    cursor = conn.cursor()
-    print('\nWould you like to login?')
-    print('  (y) - yes')
-    print('  (n) - no, create account instead')
-    login_true = input('Enter an option: ').lower()
-    if login_true == 'n':
-        show_login_menu()
-    username = input('\nPlease enter your username: ')
-    password  = input('Please enter your password: ')
-    sql_login = "SELECT authenticate(%s, %s);"
-    sql_get_user_id = 'SELECT user_id FROM user WHERE username = %s;'
-    try:
-        cursor.execute(sql_login, (username, password, ))
-        rows_authen = cursor.fetchall()
-        if rows_authen[0][0] == 1:
-            print("Authenticated!")
-            cursor.execute(sql_get_user_id, (username, ))
-            rows = cursor.fetchall()
-            if(len(rows) == 0):
-                print("There is an issue with the program")
-                quit
-            user_id = (rows[-1])[0]
-            print("Successfully logged in!\n")
-            return True
-        else:
-            print("Incorrect username or password\n")
-            return False
-        
-
-    except mysql.connector.Error as err:
-        # If you're testing, it's helpful to see more details printed.
-        if DEBUG:
-            sys.stderr(err)
-            sys.exit(1)
-        else:
-            sys.stderr('An error with login occurred, please try again with another account')
-    return False
-
-def create_account():
-    global user_id
-    # creates an account for the user
-    cursor = conn.cursor()
-    email = input('Please enter your email: ')
-    username = input('Please enter your username: ')
-    password  = input('Please enter your password: ')
-    sql_password_info = 'CALL sp_add_user(%s, %s, %s)'
-    sql_add_user = 'INSERT INTO user (user_email, username) VALUES (%s, %s); '
-    sql_get_user_id = 'SELECT user_id FROM user WHERE user_email = %s;'
-    try:
-        cursor.execute(sql_password_info, (username, password, 0, ))
-        conn.commit()
-        cursor.execute(sql_add_user, (email, username, ))
-        cursor.execute(sql_get_user_id, (email, ))
-        rows = cursor.fetchall()
-        # sets the global variable user_id
-        user_id = (rows[-1])[0]
-        print("Succesfully created new account!\n")
-    except mysql.connector.Error as err:
-        # If you're testing, it's helpful to see more details printed.
-        if DEBUG:
-            sys.stderr(err)
-            sys.exit(1)
-        else:
-            sys.stderr('An error occurred, please use a different username and password')
-    return True
-
 def select_team_menu():
     """ 
     User can either create a team or select an existing team (under their user_id)
     If create team will be prompted to the change_players menu (where their 
-    team will be emptu)
+    team will be empty)
     """
     print("Would you like to select a current team or create a new team:")
     print('  (s) - Select current team')
