@@ -6,7 +6,7 @@ DROP TRIGGER IF EXISTS tr_update_total_points;
 
 -- load the players into the player tables
 LOAD DATA LOCAL INFILE 'data/players.csv' INTO TABLE player
-FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\r\n' IGNORE 1 ROWS;
+FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
 
 -- trigger to update the points
 DELIMITER !
@@ -29,7 +29,7 @@ DELIMITER ;
 CREATE TEMPORARY TABLE staging_matchweek1 LIKE matchweek;
 
 LOAD DATA LOCAL INFILE "data/gw1.csv" INTO TABLE staging_matchweek1
-FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\r\n' IGNORE 1 ROWS;
+FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
 
 INSERT INTO matchweek (player_id, matchweek, goals, assists, clean_sheets, minutes_played, points)
 SELECT player_id, matchweek, goals, assists, clean_sheets, minutes_played, points
@@ -41,7 +41,7 @@ DROP TABLE IF EXISTS staging_matchweek1;
 CREATE TEMPORARY TABLE staging_matchweek2 LIKE matchweek;
 
 LOAD DATA LOCAL INFILE "data/gw2.csv" INTO TABLE staging_matchweek2
-FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\r\n' IGNORE 1 ROWS;
+FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;
 
 INSERT INTO matchweek (player_id, matchweek, goals, assists, clean_sheets, minutes_played, points)
 SELECT player_id, matchweek, goals, assists, clean_sheets, minutes_played, points
