@@ -246,11 +246,17 @@ def add_matchweek():
 
 def add_player():
     cursor = conn.cursor()
-    player_id = input("Enter the new player's ID: ")
+    # automatically choose the player_id to be the next available id number
+    sql_get_ids = 'SELECT player_id FROM player ORDER BY player_id; '
+    cursor.execute(sql_get_ids)
+    id_list = cursor.fetchall()
+    player_id = 1
+    if (len(id_list) != 0):
+        player_id = int(id_list[-1][0]) + 1
     player_name = input("Enter the new player's name: ")
     team_name = input("Enter the new player's team: ")
     position = input("Enter the new player's position (GK, DEF, MID, FWD): ")
-    player_value = input("Enter the new player's value: ")
+    player_value = input("Enter the new player's value (0-200): ")
     total_points = 0
     sql_insert = 'INSERT INTO player (player_id, player_name, team_name, \
         position, player_value, total_points) \
@@ -278,12 +284,13 @@ def view_stats():
     print('  (c) - Most Clean Sheets')
     print('  (m) - Most Minutes Played')
     print('  (b) - Most points')
+    print('  (v) - Highest Value')
     print('  (i) - Misc')
     # TODO: add a bunch of options for different stats that can be looked at
     ans = input('Enter an option: ').lower()
     if ans == 'e':
         return
-    elif ans in ['g', 'a', 'c', 'm', 'b']:
+    elif ans in ['g', 'a', 'c', 'm', 'b', 'v']:
         num_best = int(input("How long would you like the list of top players to be: "))
         sql = ''
         stat = ""
@@ -304,6 +311,13 @@ def view_stats():
             JOIN matchweek m ON p.player_id = m.player_id
             GROUP BY p.player_id, p.player_name, p.position
             ORDER BY total_assists DESC;       
+            """
+        elif ans == 'v':
+            stat = "Value"
+            sql = """
+            SELECT player_id, player_name, position, player_value
+            FROM player
+            ORDER BY player_value DESC;       
             """
         elif ans == 'c':
             stat = "Total Clean Sheets"

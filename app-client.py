@@ -486,6 +486,7 @@ def view_stats():
     print('  (c) - Most Clean Sheets')
     print('  (m) - Most Minutes Played')
     print('  (b) - Most points')
+    print('  (v) - Highest Value')
     print('  (i) - Misc')
     # TODO: add a bunch of options for different stats that can be looked at
     ans = input('Enter an option: ').lower()
@@ -493,7 +494,7 @@ def view_stats():
         return
     elif ans == 'p':
         change_team_menu()
-    elif ans in ['g', 'a', 'c', 'm', 'b']:
+    elif ans in ['g', 'a', 'c', 'm', 'b', 'v']:
         num_best = int(input("How long would you like the list of top players to be: "))
         sql = ''
         stat = ""
@@ -514,6 +515,13 @@ def view_stats():
             JOIN matchweek m ON p.player_id = m.player_id
             GROUP BY p.player_id, p.player_name, p.position
             ORDER BY total_assists DESC;       
+            """
+        elif ans == 'v':
+            stat = "Value"
+            sql = """
+            SELECT player_id, player_name, position, player_value
+            FROM player
+            ORDER BY player_value DESC;       
             """
         elif ans == 'c':
             stat = "Total Clean Sheets"
