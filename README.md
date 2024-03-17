@@ -5,12 +5,12 @@ Data comes from user vaastav on github. Link to the repository:
 https://github.com/vaastav/Fantasy-Premier-League/tree/master
 
 To setup the database open a SQL shell with the following commands:
-SET GLOBAL local_infile = 1;
 mysql --local-infile=1 -u root -p
 
 Then run the following commands in the SQL environment:
 
 For first time run:
+SET GLOBAL local_infile = 1;
 CREATE DATABASE fpldb;
 USE fpldb;
 
