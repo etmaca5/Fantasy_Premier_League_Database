@@ -191,7 +191,6 @@ def show_options_menu():
     print('\nWhat would you like to do? ')
     print('  (s) - View Stats')
     print('  (m) - Add Matchweek Data')
-    print('  (v) - Update Player Value')
     print('  (p) - Add Player')
     print('  (q) - Quit Program')
     print()
@@ -200,8 +199,6 @@ def show_options_menu():
         quit_ui()
     elif ans == 'm':
         add_matchweek()
-    elif ans == 'v':
-        update_player_value()
     elif ans == 's':
         view_stats()
     elif ans == 'p':
@@ -227,9 +224,9 @@ def add_matchweek():
             with open(f, 'r') as data:
                 reader = csv.reader(data, delimiter=',')
                 header = next(reader, None)
-                if header != ['player_id', 'matchweek', 'goals' , 'assists',
+                if header != ['player_id', 'matchweek', 'goals_scored' , 'assists',
                               'clean_sheets', 'minutes_played', 'points']:
-                    print("CSV file has incorrect format.")
+                    print('CSV file has incorrect format.')
                     continue
                 for row in reader:
                     try:
@@ -242,6 +239,7 @@ def add_matchweek():
                             sys.stderr(err)
                             sys.exit(1)
                         else: sys.stderr('An error occurred')
+                print('Data was successfully added!')
                 break
         except FileNotFoundError:
             print("File not found. Please input a valid file.")
@@ -266,13 +264,6 @@ def add_player():
             sys.stderr(err)
             sys.exit(1)
         else: sys.stderr('An error occurred')
-
-def update_player_value():
-    """
-    Allows an admin to update a player's value.
-    """
-    player_id = input('Enter the player_id to be updated: ')
-    # TODO: Add code to input data into database
 
 def view_stats():
     """
@@ -337,9 +328,9 @@ def view_stats():
             stat = "Total Points"
             sql = """
             SELECT p.player_id, p.player_name, p.position, SUM(m.points) AS total_points
-            FROM player player_id
-            GROUP BY p.player_id, p.player_
-            JOIN matchweek m ON p.player_id = m.pname, p.position
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
             ORDER BY total_points DESC;
             """
         cursor = conn.cursor()

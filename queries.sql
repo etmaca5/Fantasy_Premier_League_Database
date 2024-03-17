@@ -21,6 +21,8 @@ GROUP BY ft.fpl_team_name, ft.fpl_team_value;
 
 -- BASIC QUERIES FOR VIEW_STATS
 -- finds the best goalscorers
+-- corresponds to the first relational algebra, with the only difference
+-- being it is sorted so the top goalscorer is first
 SELECT p.player_id, p.player_name, p.position, SUM(m.goals) AS total_goals
 FROM player p
 JOIN matchweek m ON p.player_id = m.player_id
@@ -102,3 +104,10 @@ ORDER BY number_of_managers;
 SELECT fpl_team_name, points
 FROM fpl_team
 ORDER BY points DESC;
+
+-- delete a player from the database, simulating a player being transferred
+-- to a different league
+-- corresponds with the fourth relational algebra
+
+DELETE FROM player 
+WHERE player_name = 'Antony Matheus dos Santos' AND player_id = 372;
