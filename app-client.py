@@ -538,9 +538,9 @@ def view_stats():
             stat = "Total Points"
             sql = """
             SELECT p.player_id, p.player_name, p.position, SUM(m.points) AS total_points
-            FROM player player_id
-            GROUP BY p.player_id, p.player_
-            JOIN matchweek m ON p.player_id = m.pname, p.position
+            FROM player p
+            JOIN matchweek m ON p.player_id = m.player_id
+            GROUP BY p.player_id, p.player_name, p.position
             ORDER BY total_points DESC;
             """
         cursor = conn.cursor()
@@ -550,6 +550,7 @@ def view_stats():
             if(len(rows) == 0):
                 print("No data available")
                 return
+            print('\n')
             print("Format: Player_id, Name, Position, %s " % stat)
             for i in range(num_best):
                 row = rows[i]
@@ -619,6 +620,7 @@ def view_stats():
             if(len(rows) == 0):
                 print("No data available")
                 return
+            print('\n')
             print(stat)
             print(format)
             if adv_ans == 'a':

@@ -12,9 +12,9 @@ Then run the following commands in the SQL environment:
 For first time run:
 SET GLOBAL local_infile = 1;
 CREATE DATABASE fpldb;
-USE fpldb;
 
 Then always run:
+USE fpldb;
 source setup.sql;
 source load-data.sql;
 source setup-routines.sql;
