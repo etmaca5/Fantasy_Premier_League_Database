@@ -117,13 +117,8 @@ AFTER INSERT ON matchweek
 FOR EACH ROW
 BEGIN
     UPDATE fpl_team ft
-    JOIN (
-        SELECT ftp.fpl_team_name, SUM(m.points) AS total_points
-        FROM fpl_team_players ftp
-        JOIN matchweek m ON ftp.player_id = m.player_id
-        WHERE m.matchweek = NEW.matchweek
-        GROUP BY ftp.fpl_team_name
-    ) AS tp ON ft.fpl_team_name = tp.fpl_team_name
-    SET ft.points = ft.points + tp.total_points;
+    INNER JOIN fpl_team_players ftp ON ft.fpl_team_name = ftp.fpl_team_name
+    SET ft.points = ft.points + NEW.points
+    WHERE ftp.player_id = NEW.player_id;
 END !
 DELIMITER ;
