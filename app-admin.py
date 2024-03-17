@@ -192,6 +192,7 @@ def show_options_menu():
     print('  (s) - View Stats')
     print('  (m) - Add Matchweek Data')
     print('  (p) - Add Player')
+    print('  (d) - Delete Player')
     print('  (q) - Quit Program')
     print()
     ans = input('Enter an option: ').lower()
@@ -203,6 +204,8 @@ def show_options_menu():
         view_stats()
     elif ans == 'p':
         add_player()
+    elif ans == 'd':
+        delete_player()
     else:
         print("Please enter a valid option")
 
@@ -265,6 +268,26 @@ def add_player():
         cursor.execute(sql_insert, (player_id, player_name, team_name,
                                     position, player_value, total_points, ))
         conn.commit()
+    except mysql.connector.Error as err:
+        if DEBUG:
+            sys.stderr(err)
+            sys.exit(1)
+        else: sys.stderr('An error occurred')
+
+def delete_player():
+    cursor = conn.cursor()
+    player_to_delete = int(input("\nEnter the player_id of the player to delete: "))
+    sql_player_value = 'SELECT fn_get_player_value(%s);'
+    cursor.execute(sql_player_value, (player_to_delete, ))
+    rows = cursor.fetchall()
+    if(rows[0][0] == None):
+        print("Enter a valid player ID")
+        return
+    sql_delete = 'DELETE FROM player WHERE player_id = %s; '
+    try:
+        cursor.execute(sql_delete, (player_to_delete, ))
+        conn.commit()
+        print('Player successfully deleted!')
     except mysql.connector.Error as err:
         if DEBUG:
             sys.stderr(err)
